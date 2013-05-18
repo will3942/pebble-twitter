@@ -36,6 +36,7 @@ import android.text.Html;
 import android.text.Spannable.Factory;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 import android.app.Activity;
 import org.json.*;
@@ -62,6 +63,7 @@ public class MainActivity extends Activity {
 	static final String URL_TWITTER_OAUTH_TOKEN = "oauth_token";
 	
 	Button btnLoginTwitter;
+	TextView lblStatus;
 	
 	ProgressDialog pDialog;
 	
@@ -85,6 +87,7 @@ public class MainActivity extends Activity {
         
         //load the interface shit
         btnLoginTwitter = (Button) findViewById(R.id.btnLoginTwitter);
+        lblStatus = (TextView) findViewById(R.id.lblStatus);
         
         mSharedPreferences = getApplicationContext().getSharedPreferences("pebble-twitter-pref", 0);
         
@@ -111,153 +114,173 @@ public class MainActivity extends Activity {
         			
         			editor.putString(PREF_KEY_OAUTH_TOKEN, accessToken.getToken());
         			editor.putString(PREF_KEY_OAUTH_SECRET, accessToken.getTokenSecret());
-        			editor.putBoolean(PREF_KEY_TWITTER_LOGIN, false);
+        			editor.putBoolean(PREF_KEY_TWITTER_LOGIN, true);
         			//commit that shit!
         			editor.commit(); 
-        			
-        			ConfigurationBuilder builder = new ConfigurationBuilder();
-            		builder.setOAuthConsumerKey(TWITTER_CONSUMER_KEY);
-            		builder.setOAuthConsumerSecret(TWITTER_CONSUMER_SECRET);
-            		builder.setOAuthAccessToken(accessToken.getToken());
-            		builder.setOAuthAccessTokenSecret(accessToken.getTokenSecret());
-            		Configuration configuration = builder.build();
-            		
-        			TwitterStream twitterStream = new TwitterStreamFactory(configuration).getInstance();
-        			UserStreamListener listener = new UserStreamListener() {
-        				public void onStatus(Status status) {
-        					PebbleDictionary data = new PebbleDictionary();
-        					data.addString(0, "@" + status.getUser().getScreenName() + " - " + status.getText());
-        					PebbleKit.sendDataToPebble(getApplicationContext(), APP_UUID, data);
-        		        }
-        		        public void onDeletionNotice(StatusDeletionNotice statusDeletionNotice) {}
-        		        public void onTrackLimitationNotice(int numberOfLimitedStatuses) {}
-        		        public void onException(Exception ex) {
-        		            //fuck
-        		        }
-						@Override
-						public void onScrubGeo(long arg0, long arg1) {
-							// TODO Auto-generated method stub
-							
-						}
-						@Override
-						public void onStallWarning(StallWarning arg0) {
-							// TODO Auto-generated method stub
-							
-						}
-						@Override
-						public void onBlock(User arg0, User arg1) {
-							// TODO Auto-generated method stub
-							
-						}
-						@Override
-						public void onDeletionNotice(long arg0, long arg1) {
-							// TODO Auto-generated method stub
-							
-						}
-						@Override
-						public void onDirectMessage(DirectMessage arg0) {
-							// TODO Auto-generated method stub
-							
-						}
-						@Override
-						public void onFavorite(User arg0, User arg1, Status arg2) {
-							// TODO Auto-generated method stub
-							
-						}
-						@Override
-						public void onFollow(User arg0, User arg1) {
-							// TODO Auto-generated method stub
-							
-						}
-						@Override
-						public void onFriendList(long[] arg0) {
-							// TODO Auto-generated method stub
-							
-						}
-						@Override
-						public void onUnblock(User arg0, User arg1) {
-							// TODO Auto-generated method stub
-							
-						}
-						@Override
-						public void onUnfavorite(User arg0, User arg1,
-								Status arg2) {
-							// TODO Auto-generated method stub
-							
-						}
-						@Override
-						public void onUserListCreation(User arg0, UserList arg1) {
-							// TODO Auto-generated method stub
-							
-						}
-						@Override
-						public void onUserListDeletion(User arg0, UserList arg1) {
-							// TODO Auto-generated method stub
-							
-						}
-						@Override
-						public void onUserListMemberAddition(User arg0,
-								User arg1, UserList arg2) {
-							// TODO Auto-generated method stub
-							
-						}
-						@Override
-						public void onUserListMemberDeletion(User arg0,
-								User arg1, UserList arg2) {
-							// TODO Auto-generated method stub
-							
-						}
-						@Override
-						public void onUserListSubscription(User arg0,
-								User arg1, UserList arg2) {
-							// TODO Auto-generated method stub
-							
-						}
-						@Override
-						public void onUserListUnsubscription(User arg0,
-								User arg1, UserList arg2) {
-							// TODO Auto-generated method stub
-							
-						}
-						@Override
-						public void onUserListUpdate(User arg0, UserList arg1) {
-							// TODO Auto-generated method stub
-							
-						}
-						@Override
-						public void onUserProfileUpdate(User arg0) {
-							// TODO Auto-generated method stub
-							
-						}
-        			};
-        	        twitterStream.addListener(listener);
-        	        twitterStream.user();
-        			//sendAuthenticationNotificationToPebble();
-        			//ScheduledExecutorService scheduleTaskExecutor = Executors.newScheduledThreadPool(5);
-                	//scheduleTaskExecutor.scheduleAtFixedRate(new Runnable() {
-                		//public void run() {
-                			//try {
-                   		     //List<Status> statuses = twitter.getHomeTimeline();
-                   		     //PebbleDictionary data = new PebbleDictionary();
-                   		     //data.addString(0, statuses.get(0).getText());
-                   		     //PebbleKit.sendDataToPebble(getApplicationContext(), APP_UUID, data);
-                   			//} catch (TwitterException e) {
-                       			//shit hits the fan.
-                       			//Log.e("Error:", e.getMessage());
-                       		//}
-                		//}
-                	//}, 0, 1, TimeUnit.MINUTES);
-        			
+        			startStreaming();
         			btnLoginTwitter.setVisibility(View.GONE);
+        			long userID = accessToken.getUserId();
+        			User user = twitter.showUser(userID);
+        			String username = user.getScreenName();
+        			lblStatus.setText(Html.fromHtml("<b>Logged in as " + username + "</b>"));
         		} catch (Exception e) {
         			//oh fuck.
         			Log.e("Error:", e.getMessage());
         		}
         	}
         }
+        else {
+        	startStreaming();
+        	ConfigurationBuilder builder = new ConfigurationBuilder();
+    		builder.setOAuthConsumerKey(TWITTER_CONSUMER_KEY);
+    		builder.setOAuthConsumerSecret(TWITTER_CONSUMER_SECRET);
+    		builder.setOAuthAccessToken(mSharedPreferences.getString(PREF_KEY_OAUTH_TOKEN, "not set"));
+    		builder.setOAuthAccessTokenSecret(mSharedPreferences.getString(PREF_KEY_OAUTH_SECRET, "not set"));
+    		Configuration configuration = builder.build();
+    		TwitterFactory tfactory = new TwitterFactory(configuration);
+    		twitter = tfactory.getInstance();
+    		btnLoginTwitter.setVisibility(View.GONE);
+    		long userID = 0;
+			try {
+				userID = twitter.getId();
+			} catch (IllegalStateException e) {
+				// fuck
+			} catch (TwitterException e) {
+				//fuck
+			}
+			User user = null;
+			try {
+				user = twitter.showUser(userID);
+			} catch (TwitterException e) {
+				//fuck
+			}
+			String username = user.getScreenName();
+			lblStatus.setText(Html.fromHtml("<b>Logged in as " + username + "</b>"));
+        }
+    }
+    
+    private void startStreaming() {
+    	ConfigurationBuilder builder = new ConfigurationBuilder();
+		builder.setOAuthConsumerKey(TWITTER_CONSUMER_KEY);
+		builder.setOAuthConsumerSecret(TWITTER_CONSUMER_SECRET);
+		builder.setOAuthAccessToken(mSharedPreferences.getString(PREF_KEY_OAUTH_TOKEN, "not set"));
+		builder.setOAuthAccessTokenSecret(mSharedPreferences.getString(PREF_KEY_OAUTH_SECRET, "not set"));
+		Configuration configuration = builder.build();
+		
+		TwitterStream twitterStream = new TwitterStreamFactory(configuration).getInstance();
+		UserStreamListener listener = new UserStreamListener() {
+			public void onStatus(Status status) {
+				PebbleDictionary data = new PebbleDictionary();
+				data.addString(0, "@" + status.getUser().getScreenName() + " - " + status.getText());
+				PebbleKit.sendDataToPebble(getApplicationContext(), APP_UUID, data);
+	        }
+	        public void onDeletionNotice(StatusDeletionNotice statusDeletionNotice) {}
+	        public void onTrackLimitationNotice(int numberOfLimitedStatuses) {}
+	        public void onException(Exception ex) {
+	            //fuck
+	        }
+			@Override
+			public void onScrubGeo(long arg0, long arg1) {
+				// TODO Auto-generated method stub
+				
+			}
+			@Override
+			public void onStallWarning(StallWarning arg0) {
+				// TODO Auto-generated method stub
+				
+			}
+			@Override
+			public void onBlock(User arg0, User arg1) {
+				// TODO Auto-generated method stub
+				
+			}
+			@Override
+			public void onDeletionNotice(long arg0, long arg1) {
+				// TODO Auto-generated method stub
+				
+			}
+			@Override
+			public void onDirectMessage(DirectMessage arg0) {
+				// TODO Auto-generated method stub
+				
+			}
+			@Override
+			public void onFavorite(User arg0, User arg1, Status arg2) {
+				// TODO Auto-generated method stub
+				
+			}
+			@Override
+			public void onFollow(User arg0, User arg1) {
+				// TODO Auto-generated method stub
+				
+			}
+			@Override
+			public void onFriendList(long[] arg0) {
+				// TODO Auto-generated method stub
+				
+			}
+			@Override
+			public void onUnblock(User arg0, User arg1) {
+				// TODO Auto-generated method stub
+				
+			}
+			@Override
+			public void onUnfavorite(User arg0, User arg1,
+					Status arg2) {
+				// TODO Auto-generated method stub
+				
+			}
+			@Override
+			public void onUserListCreation(User arg0, UserList arg1) {
+				// TODO Auto-generated method stub
+				
+			}
+			@Override
+			public void onUserListDeletion(User arg0, UserList arg1) {
+				// TODO Auto-generated method stub
+				
+			}
+			@Override
+			public void onUserListMemberAddition(User arg0,
+					User arg1, UserList arg2) {
+				// TODO Auto-generated method stub
+				
+			}
+			@Override
+			public void onUserListMemberDeletion(User arg0,
+					User arg1, UserList arg2) {
+				// TODO Auto-generated method stub
+				
+			}
+			@Override
+			public void onUserListSubscription(User arg0,
+					User arg1, UserList arg2) {
+				// TODO Auto-generated method stub
+				
+			}
+			@Override
+			public void onUserListUnsubscription(User arg0,
+					User arg1, UserList arg2) {
+				// TODO Auto-generated method stub
+				
+			}
+			@Override
+			public void onUserListUpdate(User arg0, UserList arg1) {
+				// TODO Auto-generated method stub
+				
+			}
+			@Override
+			public void onUserProfileUpdate(User arg0) {
+				// TODO Auto-generated method stub
+				
+			}
+		};
+        twitterStream.addListener(listener);
+        twitterStream.user();
     }
     
     private void loginTwitter() {
+    	if (!loggedInAlready()) {
     		ConfigurationBuilder builder = new ConfigurationBuilder();
     		builder.setOAuthConsumerKey(TWITTER_CONSUMER_KEY);
     		builder.setOAuthConsumerSecret(TWITTER_CONSUMER_SECRET);
@@ -273,6 +296,35 @@ public class MainActivity extends Activity {
     			//shit hits the fan.
     			Log.e("Error:", e.getMessage());
     		}
+    	}
+    	else {
+    		startStreaming();
+    		ConfigurationBuilder builder = new ConfigurationBuilder();
+    		builder.setOAuthConsumerKey(TWITTER_CONSUMER_KEY);
+    		builder.setOAuthConsumerSecret(TWITTER_CONSUMER_SECRET);
+    		builder.setOAuthAccessToken(mSharedPreferences.getString(PREF_KEY_OAUTH_TOKEN, "not set"));
+    		builder.setOAuthAccessTokenSecret(mSharedPreferences.getString(PREF_KEY_OAUTH_SECRET, "not set"));
+    		Configuration configuration = builder.build();
+    		TwitterFactory tfactory = new TwitterFactory(configuration);
+    		twitter = tfactory.getInstance();
+    		btnLoginTwitter.setVisibility(View.GONE);
+    		long userID = 0;
+			try {
+				userID = twitter.getId();
+			} catch (IllegalStateException e) {
+				// fuck
+			} catch (TwitterException e) {
+				//fuck
+			}
+			User user = null;
+			try {
+				user = twitter.showUser(userID);
+			} catch (TwitterException e) {
+				//fuck
+			}
+			String username = user.getScreenName();
+			lblStatus.setText(Html.fromHtml("<b>Logged in as " + username + "</b>"));
+    	}
     }
     
     public void sendAuthenticationNotificationToPebble() {
